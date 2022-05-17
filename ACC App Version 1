@@ -1,0 +1,324 @@
+library(toxEval)
+library(shiny)
+library(shinydashboard)
+library(DT)
+library(tidyverse)
+library(dplyr)
+library(data.table)
+library(ggplot2)
+library(tcpl)
+library(shinyBS)
+
+
+targetgroup <- c("Nuclear Receptor",
+                 "Cell Cycle",
+                 "Undefined",              
+                 "GPCR",
+                 "Cytokine",
+                 "Cell Morphology",
+                 "Kinase",
+                 "DNA Binding",
+                 "CYP",
+                 "Cell Adhesion Molecules",
+                 "Protease",
+                 "Transporter",
+                 "Steroid Hormone",
+                 "Ion Channel",
+                 "Phosphatase",
+                 "Zebrafish",
+                 "Oxidoreductase",
+                 "Hydrolase",
+                 "Transferase",
+                 "Esterase",
+                 "Growth Factor",
+                 "Lyase",
+                 "Misc Protein",
+                 "Protease Inhibitor",
+                 "Malformation",
+                 "Deiodinase",
+                 "Histones",
+                 "Methyltransferase")
+
+flagsALL <- c("Borderline active",
+              "Only highest conc above baseline, active" ,      
+              "Only one conc above baseline, active",
+              "Noisy data",                                 
+              "Hit-call potentially confounded by overfitting",
+              "Gain AC50 < lowest conc & loss AC50 < mean conc",
+              "Biochemical assay with < 50% efficacy",
+              "Less than 50% efficacy",
+              "AC50 less than lowest concentration tested",
+              "Cell viability assay fit with gnls winning model",
+              "NA",
+              "None")
+
+shortFlags <- c("Borderline",
+                "OnlyHighest",
+                "OneAbove",
+                "Noisy",
+                "HitCall",
+                "GainAC50",
+                "Biochemical",
+                "LessThan50",
+                "ACCLessThan",
+                "GNLSmodel")
+
+assay_names <- c("Apredica" = "APR",
+                 "Attagene" = "ATG",
+                 "BioSeek" = "BSK",
+                 "NovaScreen" = "NVS",
+                 "Odyssey Thera" = "OT",
+                 "Toxicity Testing" = "TOX21",
+                 "CEETOX" = "CEETOX",
+                 "CLD" = "CLD",
+                 "TANGUAY" = "TANGUAY",
+                 "NHEERL_PADILLA" = "NHEERL_PADILLA",
+                 "NCCT" = "NCCT",
+                 "ACEA Biosciences" = "ACEA",
+                 "NHEERL_HUNTER" = "NHEERL_HUNTER", 
+                 "NHEERL_NIS" = "NHEERL_NIS" , 
+                 "NHEERL_MED" = "NHEERL_MED", 
+                 "UPITT" = "UPITT")
+
+# Define UI for application that draws a histogram
+ui <- dashboardPage(skin = "green",
+                    dashboardHeader(title="Toxicity Explorer"), 
+                    dashboardSidebar(
+                      sidebarMenu(
+                        sidebarSearchForm(textId = "searchText", buttonId = "searchButton", 
+                                          label = "Enter CAS Number (e.g 100-02-7)", icon = shiny::icon("search")),
+                        fileInput("data", "Load Data File(CSV)",multiple = FALSE, 
+                                  accept = c("text/csv",
+                                             "text/comma-separated-values,text/plain",
+                                             ".csv")),
+                        
+                        menuItem("Group", icon = icon("th"), tabName = "groupMenu",
+                                 checkboxGroupInput("group", "Groups (# End Points)",
+                                                    targetgroup,
+                                                    selected=c("Nuclear Receptor",
+                                                               "Cell Cycle",
+                                                               "GPCR",
+                                                               "Cytokine",
+                                                               "Cell Morphology",
+                                                               "Kinase",
+                                                               "DNA Binding",
+                                                               "CYP",
+                                                               "Cell Adhesion Molecules",
+                                                               "Protease",
+                                                               "Transporter",
+                                                               "Steroid Hormone",
+                                                               "Ion Channel",
+                                                               "Phosphatase",
+                                                               "Zebrafish",
+                                                               "Oxidoreductase",
+                                                               "Hydrolase",
+                                                               "Transferase",
+                                                               "Esterase",
+                                                               "Growth Factor",
+                                                               "Lyase",
+                                                               "Misc Protein",
+                                                               "Protease Inhibitor",
+                                                               "Malformation",
+                                                               "Deiodinase",
+                                                               "Histones",
+                                                               "Methyltransferase"))),
+                        menuItem("Assay", icon = icon("th"), tabName = "assay", startExpanded = FALSE,
+                                 checkboxGroupInput("assay", "Assays:",
+                                                    assay_names,
+                                                    selected= c("ACEA", "APR", "ATG", 
+                                                                "NVS", "OT",            
+                                                                "TOX21", "CEETOX", "CLD", "TANGUAY", "NHEERL_PADILLA", "NCCT",          
+                                                                "NHEERL_HUNTER", "NHEERL_NIS", "NHEERL_MED", "UPITT"))),
+                        menuItem("Flags", icon = icon("th"), tabName = "flagMenu",
+                                 checkboxGroupInput("flags", "Excluded Flags",choices = flagsALL, selected = c("Borderline active",
+                                                                                                               "Only highest conc above baseline, active" ,      
+                                                                                                               "Gain AC50 < lowest conc & loss AC50 < mean conc",
+                                                                                                               "Biochemical assay with < 50% efficacy",
+                                                                                                               "AC50 less than lowest concentration tested"))),
+                        actionButton("reset", label="Reset Filters")),
+                      textOutput("res")
+                    ),
+                    
+                    dashboardBody(
+                      tabBox(width = 12, id="mainOut",
+                             tabPanel(title = tagList("Background", shiny::icon("question")),
+                                      h1("Introduction"),
+                                      p("With this app, explore chemical toxicity data from two data sources, the ToxCast database and the NORMAN exotoxicity database (ECOTOX). Both data sources are further described below."),
+                                      h2("ToxCast"),
+                                      p("Data from the ToxCast database was accessed via the ToxEval R-package. ToxCast is a publically accessible library of high-throughput screening toxicity tests which measure the interaction of individual chemicals with human cells and cell components such as proteins, DNA, receptors, enzymes, etc. For more information visit: "),
+                                      a(href="https://www.epa.gov/chemical-research/toxicity-forecasting", "www.epa.gov/chemical-research/toxicity-forecasting"),
+                                      p("ToxCast data provides point of departures  (POD), or chemical concentrations associated with a defined biological effect. In this application the POD of concern is the Activity Concentration at Cutoff (ACC), which is the concentration at which the dose-response curve meets a defined cutoff within an assay. The cutoff is generally specific to each assay and is calculated as a multiplier of the baseline median absolute deviation (BMAD). BMAD is calculated over all the response values given by the first two concentrations of every chemical within the assay (Filer et al., 2016). The baseline region is defined as 0±3 BMAD (Figure 1). "),
+                                      plotOutput('ACCplot'),
+                                      p("Figure 1. Dose-response curve of a chemical generated by the ToxCast pipeline. The ACC is based on the activity cutoff threshold which is a multiplier of the top of the BMAD region. Figure adapted from figure 3 in Filer et al. 2016"),
+                                      h2("NORMAN ECOTOX"),
+                                      p("Data included in the ECOTOX database are experimental endpoints from toxicity tests, which are used to derive benchmark concentrations that are protective of aquatic organisms, known as Predicted No Exposure Concnetrations (PNECs). PNECs are derived from acute and chronic aquatic toxicity experiments. PNECs are the concentration below which no adverse effect is expected to occur. For more information visit: "),              
+                                      a(href="https://www.norman-network.com/nds/ecotox/?msclkid=f00802fdcf5b11ecbeb5de4c8dfac6f0", "www.norman-network.com/nds/ecotox/"),
+                             ),
+                             tabPanel(title = tagList("ACC Data Table", shiny::icon("bars")),
+                                      p("For table to generate, must enter a CAS number in the search box or upload a CSV."),
+                                      p("For CSV upload: enter CAS numbers in the first column, column header must be named 'CAS'"),
+                                      div(DT::dataTableOutput('CSV'), style = "font-size: 70%; width: 99%; overflow-y: scroll;overflow-x: scroll"),
+                                      downloadButton('downloadACCTable', 'Download CSV'),
+                             ),
+                             tabPanel(title = tagList("ACC Summary Statistics", shiny::icon("bars")),
+                                      actionButton("update", label="Update ACC Summary Table"),
+                                      p("must select 'Update ACC Summary Table' to reflect any updates to filter selections"),
+                                      div(DT::dataTableOutput('CSV2'), style = "font-size: 90%; width: 100%; overflow-y: scroll;overflow-x: scroll"),
+                                      downloadButton('downloadGroupTable2', 'Download CSV'),
+                             ),
+                             tabPanel(title = tagList("Plot", shiny::icon("bar-chart-o")),
+                                      plotOutput('plot')
+                             ),
+                             tabPanel(title = tagList("PNEC", shiny::icon("bars")),
+                                      div(DT::dataTableOutput('PNEC'), style = "font-size: 70%; width: 99%; overflow-y: scroll;overflow-x: scroll"),
+                                      downloadButton('downloadGroupTable4', 'Download CSV'),
+                             ),
+                             
+                             
+                      )
+                    )
+)
+
+server <- function(input, output, session) {
+  
+  
+  output$text <- renderText({
+    input$txt
+  })
+  
+  data1 <- reactive({
+    file <- input$data
+    if(is.null(file)){
+      dataset <- (input$searchText)
+      ACC <- get_ACC(dataset)}
+    else{
+      file <- input$data
+      ext <- tools::file_ext(file$datapath)
+      
+      req(file)
+      validate(need(ext == "csv", "Please upload a csv file"))
+      
+      csv <- read.csv(file$datapath,
+                      fileEncoding = 'UTF-8-BOM')
+      csv1 <- as.data.frame(csv)
+      ACC <- get_ACC(csv1$CAS)}
+    cleaned_ep <- clean_endPoint_info(end_point_info)
+    filtered_ep <- filter_groups(cleaned_ep)
+    ACC2 <- ACC %>%
+      dplyr::filter(endPoint %in% filtered_ep$endPoint)
+    end_point_infosubset <- subset(cleaned_ep, select = c("assay_component_endpoint_name", "intended_target_family",
+                                                          "assay_source_name"))
+    mergeddata<- merge(ACC2, end_point_infosubset, by.x = "endPoint", by.y = "assay_component_endpoint_name")
+    ACCData3 <- mergeddata[,c(2,7,3,4,5,6,1,8,9)]
+    ACCData3$flags[is.na(ACCData3$flags)] <- "NA"
+    ACCData4 <- ACCData3 %>%
+      dplyr::filter(intended_target_family %in% input$group) %>%
+      dplyr::filter(assay_source_name %in% input$assay) %>%
+      filter(!grepl(paste(input$flags, collapse = "|"), flags))
+    as.data.frame(ACCData4)
+    
+  })
+  
+  output$CSV <- DT::renderDataTable({
+    datatable(data1(),
+              callback = JS("var tips = ['Row Names', 'Chemical CAS number', 'Chemical name per CompTox',
+            'Flags', 'ACC (log uM)', 
+            'Molecular Weight', 'ACC (ug/L)', 
+            'Assay Name', 'Intended Target Family', 'Assay Source'],
+    header = table.columns().header();
+for (var i = 0; i < tips.length; i++) {
+  $(header[i]).attr('title', tips[i]);
+}")) %>%
+      formatRound(c(4:6), 2)
+  })
+  
+  output$ACCplot <- renderPlot({
+    logc <- 1:10
+    r1 <- sapply(logc, tcplHillVal, ga = 5, tp = 50, gw = 0.5)
+    r2 <- sapply(logc, tcplHillVal, ga = 5, tp = 30, gw = 0.5)
+    p1 <- tcplFit(logc = logc, resp = r1, bmad = 10)
+    p2 <- tcplFit(logc = logc, resp = r2, bmad = log2(1.5))
+    
+    ## In the dummy data above, the two plots are on very different scales
+    
+    plot(r1 ~ logc, pch = 20, cex = 0.01, xlab = "Concentration", ylab = "Response",
+         cex.lab = 1, line=0, yaxt = "n", xaxt = "n") 
+    tcplAddModel(pars = p1, modl = "hill")
+    
+    abline(v = 3.55, lwd = 3, lty = "solid", col = "dodgerblue2")
+    text(x = 3.56, y = par()$usr[4]*0.9, 
+         font = 2, labels = "ACC", cex = 0.8, pos = 2, srt = 90)
+    
+    
+    abline(h = 8, lwd = 3, lty = "dashed", col = "gray30")
+    rect(xleft = par()$usr[1],
+         xright = par()$usr[2], 
+         ybottom = -15, 
+         ytop = 5,
+         border = NA, 
+         col = "yellow",
+         density = 15, 
+         angle = 45)
+    text(x = 8.3, y = 12.2,
+         font = 2, labels = "activity cutoff threshold", cex = 1, pos = 1)
+    text(x = 8.9, y = 5.5,
+         font = 2, labels = "BMAD {", cex = 2.25, pos = 1)
+    points(x = c(3.55), y = c(8.1),
+           pch = 21, cex = 1, col = "gray30", lwd = 2,
+           bg = c("dodgerblue2"))
+    
+    op<-par(no.readonly=TRUE)
+  })
+  
+  output$downloadACCTable <- downloadHandler(
+    filename = "tableACC.csv",
+    content = function(file) {
+      write.csv(data1(), file = file, row.names = FALSE)
+    }
+    
+  )
+  
+  observe({
+    input$reset
+    updateSelectInput(session, "group", selected=c("Nuclear Receptor",
+                                                   "Cell Cycle",
+                                                   "GPCR",
+                                                   "Cytokine",
+                                                   "Cell Morphology",
+                                                   "Kinase",
+                                                   "DNA Binding",
+                                                   "CYP",
+                                                   "Cell Adhesion Molecules",
+                                                   "Protease",
+                                                   "Transporter",
+                                                   "Steroid Hormone",
+                                                   "Ion Channel",
+                                                   "Phosphatase",
+                                                   "Zebrafish",
+                                                   "Oxidoreductase",
+                                                   "Hydrolase",
+                                                   "Transferase",
+                                                   "Esterase",
+                                                   "Growth Factor",
+                                                   "Lyase",
+                                                   "Misc Protein",
+                                                   "Protease Inhibitor",
+                                                   "Malformation",
+                                                   "Deiodinase",
+                                                   "Histones",
+                                                   "Methyltransferase"))
+    updateSelectInput(session, "assay", selected= c("ACEA", "APR", "ATG", 
+                                                    "NVS", "OT",            
+                                                    "TOX21", "CEETOX", "CLD", "TANGUAY", "NHEERL_PADILLA", "NCCT",          
+                                                    "NHEERL_HUNTER", "NHEERL_NIS", "NHEERL_MED", "UPITT"))
+    updateSelectInput(session, "flags", selected = c("Borderline active",
+                                                     "Only highest conc above baseline, active" ,      
+                                                     "Gain AC50 < lowest conc & loss AC50 < mean conc",
+                                                     "Biochemical assay with < 50% efficacy",
+                                                     "AC50 less than lowest concentration tested"))
+    #updateActionButton(session, "submit", selected=FALSE)
+  })
+  
+}
+
+shinyApp(ui, server)
