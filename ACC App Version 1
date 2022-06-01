@@ -132,7 +132,7 @@ ui <- dashboardPage(skin = "green",
                         icon("info-circle"), "For CSV upload: list CAS numbers in the first column, column header must be named 'CAS'.",
                         downloadButton('downloadcsvdemodata', 'Download CSV of Demo Data'),
                         br(" "),
-                        p("To load data from demonstration file, click below. Data may take a moment to loaD in data tables"),
+                        p("To load data from demonstration file, click below. Data may take a moment to load in data tables."),
                         actionButton('rundemodata', 'Run Demo Data',
                                      style = "color: #fff; background-color: #27ae60; border-color: #fff;padding: 5px 14px 5px 14px;margin: 5px 5px 5px 5px; "), actionButton('resetALL', 'Reset All Inputs and Filters',
                                      style = "color: #fff; background-color: red; border-color: #fff;width:130;padding: 5px 5px 5px 5px;margin: 5px 5px 5px 5px; "),
@@ -362,7 +362,7 @@ server <- function(input, output, session) {
     if(input$rundemodata){
       demodata2 <- c("100-02-7", "102-06-7", "115-96-8", "121-33-5", "122-20-3", "122931-48-0", "136-85-6", "137-58-6", "149-30-4", "1763-23-1", "2008-58-4", "2387-23-7", "24579-73-5", "2706-90-3", "28343-61-5", "28553-12-0", "307-24-4", "3089-11-0", "330-54-1", "335-67-1", "34014-18-1", "355-46-4", "3622-84-2", "375-73-5", "375-85-9", "51-28-5", "51384-51-1", "537-46-2", "55335-06-3", "58-08-2", "59756-60-4", "6837-24-7", "69-72-7", "74223-64-6", "78-51-3", "80-09-1", "93413-62-8", "93413-69-5", "941-57-1", "95-14-7")
       pnec %>% 
-        filter(grepl(paste(demodata2, collapse = "|"), CAS))
+        filter(grepl(paste0("\\b(",paste(demodata2, collapse = "|"), ")\\b"), CAS))
     } else {
     if(is.null(file)){
       pnec %>% 
@@ -378,7 +378,7 @@ server <- function(input, output, session) {
       csv1 <- as.data.frame(csv)
       colnames(csv1) <- "CAS"
       pnec2 <- pnec %>%
-        filter(grepl(paste(csv1$CAS, collapse = "|"), CAS))}
+        filter(grepl(paste0("\\b(",paste(csv1$CAS, collapse = "|"),")\\b"), CAS))}
   }
   })
   
