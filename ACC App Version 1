@@ -8,6 +8,13 @@ library(data.table)
 library(ggplot2)
 library(tcpl)
 library(shinyBS)
+library(shinyjs)
+
+# Define the js method that resets the page
+jsResetCode <- "shinyjs.reset = function() {history.go(0)}" 
+#jsResetCode <- "shinyjs.reset = function() {window.location.reload(true)}"
+
+demodata <- read.csv("Book1.csv", fileEncoding = 'UTF-8-BOM')
 
 pnec_data <- read.csv("PNEC.csv")
 pnec <- pnec_data %>%
@@ -58,28 +65,28 @@ flagsALL <- c("Borderline active",
               "None")
 
 Flags <- c("Borderline active*",
-              "Only highest conc above baseline, active*" ,      
-              "Only one conc above baseline, active",
-              "Noisy curves, relative to the assay",                                 
-              "Hit-call potentially confounded by overfitting",
-              "Gain AC50 < lowest conc & loss AC50 < mean conc*",
-              "Biochemical assay with < 50% efficacy*",
-              "Less than 50% efficacy",
-              "AC50 less than lowest concentration tested*",
-              "Cell viability assay fit with gnls winning model",
-              "NA")
+           "Only highest conc above baseline, active*" ,      
+           "Only one conc above baseline, active",
+           "Noisy curves, relative to the assay",                                 
+           "Hit-call potentially confounded by overfitting",
+           "Gain AC50 < lowest conc & loss AC50 < mean conc*",
+           "Biochemical assay with < 50% efficacy*",
+           "Less than 50% efficacy",
+           "AC50 less than lowest concentration tested*",
+           "Cell viability assay fit with gnls winning model",
+           "NA")
 
 Description <- c("Assay is active with borderline activity*",
-              "Single point hit with activity only at the highest concentration tested*" ,      
-              "Single point hit with activity not at the highest concentration tested",
-              "Noisy concentration series (root mean square error is greater than the cutoff for the assay endpoint)",                                 
-              "Hit-call that would change after small correction to the AIC value",
-              "Gain-loss model won, though the gain concnetration at half-maximal activity (AC50) is less than the minimum tested concentration, and the loss AC50 is less than the mean tested concentration*",
-              "Concentration series for biochemical assay with efficacy values less than 50%*",
-              "Concentration series with efficacy values less than 50%",
-              "Actvity concentration at half-maximal activity is less than the lowest concentration tested*",
-              "Cell viability assay fit with the gain-loss model",
-              "No Associated Flags")
+                 "Single point hit with activity only at the highest concentration tested*" ,      
+                 "Single point hit with activity not at the highest concentration tested",
+                 "Noisy concentration series (root mean square error is greater than the cutoff for the assay endpoint)",                                 
+                 "Hit-call that would change after small correction to the AIC value",
+                 "Gain-loss model won, though the gain concnetration at half-maximal activity (AC50) is less than the minimum tested concentration, and the loss AC50 is less than the mean tested concentration*",
+                 "Concentration series for biochemical assay with efficacy values less than 50%*",
+                 "Concentration series with efficacy values less than 50%",
+                 "Actvity concentration at half-maximal activity is less than the lowest concentration tested*",
+                 "Cell viability assay fit with the gain-loss model",
+                 "No Associated Flags")
 
 printdf <- data.frame(Flags, Description)
 
@@ -110,15 +117,25 @@ ui <- dashboardPage(skin = "green",
                       width = 350,
                       sidebarMenu(
                         style = "white-space: normal;",
+                        tags$style(".skin-green .sidebar .shiny-download-link { color: #444; }"),
                         sidebarSearchForm(textId = "searchText", buttonId = "searchButton", 
                                           label = "Enter CAS Number (e.g 100-02-7)", icon = shiny::icon("search")),
                         icon("info-circle"),"CAS number must be separated by hyphens into three parts, the first part will include two to seven digits, the second part will be two digits, and the third part will be a single digit (i.e. xxxxxxx-yy-z).",
+                        br(" "),
+                        p("To search by multiple CAS numbers:"),
+                        div(style = "margin-top: -10px"),
                         fileInput("data", "Load Data File(CSV)",multiple = FALSE, 
                                   accept = c("text/csv",
                                              "text/comma-separated-values,text/plain",
                                              ".csv")), 
+                        div(style = "margin-bottom: -30px"),
                         icon("info-circle"), "For CSV upload: list CAS numbers in the first column, column header must be named 'CAS'.",
-                        br(),
+                        downloadButton('downloadcsvdemodata', 'Download CSV of Demo Data'),
+                        br(" "),
+                        p("To load data from demonstration file, click below. Data may take a moment to loaD in data tables"),
+                        actionButton('rundemodata', 'Run Demo Data',
+                                     style = "color: #fff; background-color: #27ae60; border-color: #fff;padding: 5px 14px 5px 14px;margin: 5px 5px 5px 5px; "), actionButton('resetALL', 'Reset All Inputs and Filters',
+                                     style = "color: #fff; background-color: red; border-color: #fff;width:130;padding: 5px 5px 5px 5px;margin: 5px 5px 5px 5px; "),
                         h2("Filters"),
                         menuItem("Intended Target Family", icon = icon("th"), tabName = "groupMenu",
                                  checkboxGroupInput("group", "Intended Target Family",
@@ -190,13 +207,13 @@ ui <- dashboardPage(skin = "green",
                                       br(),
                                       h2("References"),
                                       p("Corsi, S. R., DeCicco, L. A., Villeneuve, D. L., Blackwell, B. R., Fay, K. A., Ankley, G. T., & Baldwin, A. K. (2019). Prioritizing chemicals of ecological concern in Great Lakes tributaries using high-throughput screening data and adverse outcome pathways. Science of the Total Environment, 686, 995–1009. https://doi.org/10.1016/j.scitotenv.2019.05.457"),
-p("De Cicco, L. A., Corsi, S. R., Blackwell, B. R., Villeneuve, D. L., & Ankley, G. T. (2022). toxEval: Evaluation of measured concentration data using the ToxCast high-throughput screening database or a user-defined set of concentration benchmarks (R Package version 1.2.0). U.S. Geological Survey."),
-p("Filer, D. L. (2022). tcpl: ToxCast Data Analysis Pipeline. R package version 2.1.0.
+                                      p("De Cicco, L. A., Corsi, S. R., Blackwell, B. R., Villeneuve, D. L., & Ankley, G. T. (2022). toxEval: Evaluation of measured concentration data using the ToxCast high-throughput screening database or a user-defined set of concentration benchmarks (R Package version 1.2.0). U.S. Geological Survey."),
+                                      p("Filer, D. L. (2022). tcpl: ToxCast Data Analysis Pipeline. R package version 2.1.0.
   https://CRAN.R-project.org/package=tcpl"),
-p("Filer, D. L., Kothiya, P., Woodrow Setzer, R., Judson, R. S., & Martin, M. T. (2016). Tcpl: The ToxCast pipeline for high-throughput screening data. Bioinformatics, 33(4). https://doi.org/10.1093/bioinformatics/btw680"),
-p("NORMAN Network. (2022). NORMAN Ecotoxicology Database. https://www.norman-network.com/nds/ecotox/"),
-p("U.S. EPA. (2022). ComTox Chemicals Dashboard. https://comptox.epa.gov/dashboard"),
-p("Williams, A. J., Grulke, C. M., Edwards, J., McEachran, A. D., Mansouri, K., Baker, N. C., Patlewicz, G., Shah, I., Wambaugh, J. F., Judson, R. S., & Richard, A. M. (2017). The CompTox Chemistry Dashboard: A community data resource for environmental chemistry. Journal of Cheminformatics, 9(1), 1–27. https://doi.org/10.1186/s13321-017-0247-6")
+                                      p("Filer, D. L., Kothiya, P., Woodrow Setzer, R., Judson, R. S., & Martin, M. T. (2016). Tcpl: The ToxCast pipeline for high-throughput screening data. Bioinformatics, 33(4). https://doi.org/10.1093/bioinformatics/btw680"),
+                                      p("NORMAN Network. (2022). NORMAN Ecotoxicology Database. https://www.norman-network.com/nds/ecotox/"),
+                                      p("U.S. EPA. (2022). ComTox Chemicals Dashboard. https://comptox.epa.gov/dashboard"),
+                                      p("Williams, A. J., Grulke, C. M., Edwards, J., McEachran, A. D., Mansouri, K., Baker, N. C., Patlewicz, G., Shah, I., Wambaugh, J. F., Judson, R. S., & Richard, A. M. (2017). The CompTox Chemistry Dashboard: A community data resource for environmental chemistry. Journal of Cheminformatics, 9(1), 1–27. https://doi.org/10.1186/s13321-017-0247-6")
                              ),
                              tabPanel(title = tagList("ACC Data Table", shiny::icon("bars")),
                                       p("For table to generate, must enter a CAS number in the search box or upload a CSV."),
@@ -220,62 +237,62 @@ p("Williams, A. J., Grulke, C. M., Edwards, J., McEachran, A. D., Mansouri, K., 
                              tabPanel(title = tagList("Filters Explained", shiny::icon("cogs")),
                                       p("Data can be filtered using the sidebar checkboxes. Initial filters have been set to match the filters preselected by the toxEval R package. Details regarding filter selections are included in the tabs below."),
                                       p("In addition to the following filters, the toxEval function", code("clean_endpoint_info"),"is applied, which is a function that codes for the removel of specific assays. The targeted assay removed are those related to non-specific endpoints."),
-                             br(),
-                             tabBox(
-                               id = "tabset1", 
-                               width = "250px",
-                               tabPanel("Intended Target Family", "Each assay endpoint is evaluated and assigned an intended target family. The intended target family is a generalized biological activity used to group targets.", 
-                               br(" "),
-                               span("The groups that have been removed by default are 'Undefined' and 'Background Measurement' as neither of these are associated with a genetic family or biological process.")),
-                               tabPanel("Assay Source", "Each identified assay source is the name of the entity that conducted the assay. By default the assay source 'Bioseek' is excluded due to comparatively low ACC values (Corsi et al. 2019)."),
-                               tabPanel("Flags", "Flags are assigned to assay results as part of quality assurance for inclusion in the CompTox database. Flags with an * have been removed in accordance with toxEval.", 
-                                        "Flag descriptions were obtained from the tcpl R package (Filer, 2022).", 
-                                        br(" "),
-                                        tableOutput("table")),
-                             )),
-                               tabPanel(title = tagList("Definitions"),
-                                        h3("Definitions related to ToxCast data:"),
-                                        strong("High-throughput Screening Assay (Assay):"), 
-                                        "Exposure of living cells or cell components, such as biological macromolecules ( i.e. proteins), to chemicals.",
-                                        br(" "),
-                                        strong("Active Assay:"),
-                                        "In CompTox, active assays are those with dose-response curves that are fit by either the Hill or Gain-Loss model, the top of the curve must exceed the activity cutoff threshold (see figure 1), and at least one concentration of the chemical must exceed the activity curoff threshold.",
-                                        br(" "),
-                                        strong("Activity Concentration at Cutoff (ACC):"),
-                                        "The chemical concentration at which the activity cutoff concentration is reached.",
-                                        br(" "),
-                                        strong("Activity Concentration at 50% (AC50):"),
-                                        "The chemical concentration at 50% of maximum activity.",
-                                        br(" "),
-                                        strong("Intended Target Family:"),
-                                        "Either the genetic family or the biological process investigated by the assay.",
-                                        br(" "),
-                                        strong("ToxCast:"),
-                                        "Database for over 1,800 chemicals of a wide range of sources, including industrial and consumer products, screened in more than 700 high-throughputs assays covering a wide variety of cell responses.",
-                                        hr(),
-                                        h3("Definitions related to Norman data:"),
-                                        strong("Norman Ecotoxicology Database (ECOTOX):"),
-                                        "A database for chemical benchmark concentrations (i.e. PNEC) which have been developed either experimentally, from toxicity tests, or through predictive models such as quantitative structure-activity relationships (QSAR).",
-                                        br(" "),
-                                        strong("Point of Departure (POD):"),
-                                        "A chemical concentration associated with a defined effect (i.e. AC50 and ACC).",
-                                        br(" "),
-                                        strong("Predicted No Effect Concentration (PNEC):"),
-                                        "The concentration below which no adverse effect is expected to occur.",
-                                        br(" "),
-                                        "Definitions were adapted from the following webpages, follow the links below for more information:",
-                                        br(" "),
-                                        a(href="https://www.epa.gov/chemical-research/toxcast-owners-manual-guidance-exploring-data#:~:text=ToxCast%20is%20a%20multi%2Dyear,other%20biological%20molecules%20to%20chemicals.", "ToxCast Owner's Manual"),
-                                        br(" "),
-                                        a(href="https://www.epa.gov/sites/default/files/2015-08/documents/toxcast_assay_annotation_data_users_guide_20141021.pdf", "ToxCast Assay Annotation Data Users Guide"),
-                                        br(" "),
-                                        a(href="http://cran.nexr.com/web/packages/tcpl/vignettes/tcpl_Overview.pdf", "TCPL Package Overview"),
-                                        br(" "),
-                                        a(href="https://www.norman-network.com/nds/ecotox/", "Norman Ecotoxicology Database")),
-                              
+                                      br(),
+                                      tabBox(
+                                        id = "tabset1", 
+                                        width = "250px",
+                                        tabPanel("Intended Target Family", "Each assay endpoint is evaluated and assigned an intended target family. The intended target family is a generalized biological activity used to group targets.", 
+                                                 br(" "),
+                                                 span("The groups that have been removed by default are 'Undefined' and 'Background Measurement' as neither of these are associated with a genetic family or biological process.")),
+                                        tabPanel("Assay Source", "Each identified assay source is the name of the entity that conducted the assay. By default the assay source 'Bioseek' is excluded due to comparatively low ACC values (Corsi et al. 2019)."),
+                                        tabPanel("Flags", "Flags are assigned to assay results as part of quality assurance for inclusion in the CompTox database. Flags with an * have been removed in accordance with toxEval.", 
+                                                 "Flag descriptions were obtained from the tcpl R package (Filer, 2022).", 
+                                                 br(" "),
+                                                 tableOutput("table")),
+                                      )),
+                             tabPanel(title = tagList("Definitions"),
+                                      h3("Definitions related to ToxCast data:"),
+                                      strong("High-throughput Screening Assay (Assay):"), 
+                                      "Exposure of living cells or cell components, such as biological macromolecules ( i.e. proteins), to chemicals.",
+                                      br(" "),
+                                      strong("Active Assay:"),
+                                      "In CompTox, active assays are those with dose-response curves that are fit by either the Hill or Gain-Loss model, the top of the curve must exceed the activity cutoff threshold (see figure 1), and at least one concentration of the chemical must exceed the activity curoff threshold.",
+                                      br(" "),
+                                      strong("Activity Concentration at Cutoff (ACC):"),
+                                      "The chemical concentration at which the activity cutoff concentration is reached.",
+                                      br(" "),
+                                      strong("Activity Concentration at 50% (AC50):"),
+                                      "The chemical concentration at 50% of maximum activity.",
+                                      br(" "),
+                                      strong("Intended Target Family:"),
+                                      "Either the genetic family or the biological process investigated by the assay.",
+                                      br(" "),
+                                      strong("ToxCast:"),
+                                      "Database for over 1,800 chemicals of a wide range of sources, including industrial and consumer products, screened in more than 700 high-throughputs assays covering a wide variety of cell responses.",
+                                      hr(),
+                                      h3("Definitions related to Norman data:"),
+                                      strong("Norman Ecotoxicology Database (ECOTOX):"),
+                                      "A database for chemical benchmark concentrations (i.e. PNEC) which have been developed either experimentally, from toxicity tests, or through predictive models such as quantitative structure-activity relationships (QSAR).",
+                                      br(" "),
+                                      strong("Point of Departure (POD):"),
+                                      "A chemical concentration associated with a defined effect (i.e. AC50 and ACC).",
+                                      br(" "),
+                                      strong("Predicted No Effect Concentration (PNEC):"),
+                                      "The concentration below which no adverse effect is expected to occur.",
+                                      br(" "),
+                                      "Definitions were adapted from the following webpages, follow the links below for more information:",
+                                      br(" "),
+                                      a(href="https://www.epa.gov/chemical-research/toxcast-owners-manual-guidance-exploring-data#:~:text=ToxCast%20is%20a%20multi%2Dyear,other%20biological%20molecules%20to%20chemicals.", "ToxCast Owner's Manual"),
+                                      br(" "),
+                                      a(href="https://www.epa.gov/sites/default/files/2015-08/documents/toxcast_assay_annotation_data_users_guide_20141021.pdf", "ToxCast Assay Annotation Data Users Guide"),
+                                      br(" "),
+                                      a(href="http://cran.nexr.com/web/packages/tcpl/vignettes/tcpl_Overview.pdf", "TCPL Package Overview"),
+                                      br(" "),
+                                      a(href="https://www.norman-network.com/nds/ecotox/", "Norman Ecotoxicology Database")),
+                             
                       ),   
-                      )
                     )
+)
 
 
 server <- function(input, output, session) {
@@ -287,10 +304,15 @@ server <- function(input, output, session) {
   
   data1 <- reactive({
     file <- input$data
+    if(input$rundemodata){
+      demodata2 <- c("100-02-7", "102-06-7", "115-96-8", "121-33-5", "122-20-3", "122931-48-0", "136-85-6", "137-58-6", "149-30-4", "1763-23-1", "2008-58-4", "2387-23-7", "24579-73-5", "2706-90-3", "28343-61-5", "28553-12-0", "307-24-4", "3089-11-0", "330-54-1", "335-67-1", "34014-18-1", "355-46-4", "3622-84-2", "375-73-5", "375-85-9", "51-28-5", "51384-51-1", "537-46-2", "55335-06-3", "58-08-2", "59756-60-4", "6837-24-7", "69-72-7", "74223-64-6", "78-51-3", "80-09-1", "93413-62-8", "93413-69-5", "941-57-1", "95-14-7")
+      ACC <- get_ACC(demodata2)
+    } else {
     if(is.null(file)){
       dataset <- (input$searchText)
-      ACC <- get_ACC(dataset)}
-    else{
+      ACC <- get_ACC(dataset)
+      
+    } else{
       file <- input$data
       ext <- tools::file_ext(file$datapath)
       
@@ -300,7 +322,9 @@ server <- function(input, output, session) {
       csv <- read.csv(file$datapath,
                       fileEncoding = 'UTF-8-BOM')
       csv1 <- as.data.frame(csv)
-      ACC <- get_ACC(csv1$CAS)}
+      ACC <- get_ACC(csv1$CAS)
+    } 
+      }
     cleaned_ep <- clean_endPoint_info(end_point_info)
     filtered_ep <- filter_groups(cleaned_ep)
     ACC2 <- ACC %>%
@@ -315,7 +339,7 @@ server <- function(input, output, session) {
       dplyr::filter(assay_source_name %in% input$assay) %>%
       filter(!grepl(paste(input$flags, collapse = "|"), flags))
     as.data.frame(ACCData4)
-
+    
   })
   
   data2 <- eventReactive(input$update, {
@@ -335,10 +359,15 @@ server <- function(input, output, session) {
   
   data4 <- reactive({
     file <- input$data
+    if(input$rundemodata){
+      demodata2 <- c("100-02-7", "102-06-7", "115-96-8", "121-33-5", "122-20-3", "122931-48-0", "136-85-6", "137-58-6", "149-30-4", "1763-23-1", "2008-58-4", "2387-23-7", "24579-73-5", "2706-90-3", "28343-61-5", "28553-12-0", "307-24-4", "3089-11-0", "330-54-1", "335-67-1", "34014-18-1", "355-46-4", "3622-84-2", "375-73-5", "375-85-9", "51-28-5", "51384-51-1", "537-46-2", "55335-06-3", "58-08-2", "59756-60-4", "6837-24-7", "69-72-7", "74223-64-6", "78-51-3", "80-09-1", "93413-62-8", "93413-69-5", "941-57-1", "95-14-7")
+      pnec %>% 
+        filter(grepl(paste(demodata2, collapse = "|"), CAS))
+    } else {
     if(is.null(file)){
       pnec %>% 
-        filter(grepl(input$searchText, CAS))}
-    else{
+        filter(grepl(input$searchText, CAS))
+    } else{
       file <- input$data
       ext <- tools::file_ext(file$datapath)
       
@@ -350,6 +379,7 @@ server <- function(input, output, session) {
       colnames(csv1) <- "CAS"
       pnec2 <- pnec %>%
         filter(grepl(paste(csv1$CAS, collapse = "|"), CAS))}
+  }
   })
   
   
@@ -374,8 +404,8 @@ for (var i = 0; i < tips.length; i++) {
   })
   
   output$CSV2 <- DT::renderDataTable({
-      DT::datatable(data2(),
-                    callback = JS("var tips = ['Row Names', 'Chemical CAS number', 'Chemical name per CompTox', 'Average ACC for selected active assays',
+    DT::datatable(data2(),
+                  callback = JS("var tips = ['Row Names', 'Chemical CAS number', 'Chemical name per CompTox', 'Average ACC for selected active assays',
             'Median ACC for selected active assays', 'Minimum ACC for selected active assays', 
             'Maximum ACC for selected active assays', 'Number of active assays for selected filters', 
             '5th percentile of ACC for selected filters'],
@@ -383,7 +413,7 @@ for (var i = 0; i < tips.length; i++) {
 for (var i = 0; i < tips.length; i++) {
   $(header[i]).attr('title', tips[i]);
 }")) %>%
-        formatRound(columns = c(3:6, 8), digits = 2)
+      formatRound(columns = c(3:6, 8), digits = 2)
   })
   
   
@@ -434,8 +464,8 @@ for (var i = 0; i < tips.length; i++) {
   })
   
   output$table <- renderTable(printdf)
-    
-    
+  
+  
   output$PNEC <- DT::renderDataTable({
     datatable(data4())  %>% 
       formatRound(c(3:8), 2)
@@ -497,8 +527,8 @@ for (var i = 0; i < tips.length; i++) {
                                                      "AC50 less than lowest concentration tested"))
     #updateActionButton(session, "submit", selected=FALSE)
   })
-    
-    
+  
+  
   output$downloadGroupTable2 <- downloadHandler(
     filename = "tableSum.csv",
     content = function(file) {
@@ -507,6 +537,17 @@ for (var i = 0; i < tips.length; i++) {
       else {
         write.csv(data5(), file = file, row.names = FALSE)}
     })
+  
+  output$downloadcsvdemodata <- downloadHandler(
+    filename = "demodata.csv",
+    content = function(file) {
+      write.csv(demodata, file = file, row.names = FALSE)
+    })
+  
+  observeEvent(input$resetALL, {
+    js$reset()
+  })
+  
 }
 
 shinyApp(ui, server)
