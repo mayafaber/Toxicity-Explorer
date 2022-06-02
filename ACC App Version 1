@@ -127,15 +127,14 @@ ui <- dashboardPage(skin = "green",
                         fileInput("data", "Load Data File(CSV)",multiple = FALSE, 
                                   accept = c("text/csv",
                                              "text/comma-separated-values,text/plain",
-                                             ".csv")), 
+                                             ".csv")),
                         div(style = "margin-bottom: -30px"),
-                        icon("info-circle"), "For CSV upload: list CAS numbers in the first column, column header must be named 'CAS'.",
-                        downloadButton('downloadcsvdemodata', 'Download CSV of Demo Data'),
+                        icon("info-circle"), "For CSV upload: list CAS numbers in the first column, column header must be named 'CAS'. To load data from a demonstration file, click below. Data may take a moment to load in tables.",
+                        br(),
+                        div(style="display:inline-block",actionButton('rundemodata', 'Run Demo Data',
+                                                                      style = "color: #fff; background-color: #27ae60; border-color: #fff;padding: 6px 5px 8px 5px;margin: 20x 20px 20px 20px; ")),
+                        div(style="display:inline-block",downloadButton('downloadcsvdemodata', 'Download CSV of Demo Data')),
                         br(" "),
-                        p("To load data from demonstration file, click below. Data may take a moment to load in data tables."),
-                        actionButton('rundemodata', 'Run Demo Data',
-                                     style = "color: #fff; background-color: #27ae60; border-color: #fff;padding: 5px 14px 5px 14px;margin: 5px 5px 5px 5px; "), actionButton('resetALL', 'Reset All Inputs and Filters',
-                                     style = "color: #fff; background-color: red; border-color: #fff;width:130;padding: 5px 5px 5px 5px;margin: 5px 5px 5px 5px; "),
                         h2("Filters"),
                         menuItem("Intended Target Family", icon = icon("th"), tabName = "groupMenu",
                                  checkboxGroupInput("group", "Intended Target Family",
@@ -184,6 +183,9 @@ ui <- dashboardPage(skin = "green",
                         shiny::actionButton(inputId='source', label="Link to Source Code", 
                                             icon = icon("th"), 
                                             onclick ="window.open('https://github.com/mayafaber/Toxicity-Explorer/blob/main/ACC%20App%20Version%201')")),
+                      p("To resent all inputs and filters:"),
+                      actionButton('resetALL', 'Click Here to Reload Page',
+                                   style = "color: #fff; background-color: red; border-color: #fff;width:130;padding: 5px 5px 5px 5px;margin: 5px 5px 5px 15px; "),
                       textOutput("res")
                     ),
                     
@@ -245,7 +247,7 @@ ui <- dashboardPage(skin = "green",
                                                  br(" "),
                                                  span("The groups that have been removed by default are 'Undefined' and 'Background Measurement' as neither of these are associated with a genetic family or biological process.")),
                                         tabPanel("Assay Source", "Each identified assay source is the name of the entity that conducted the assay. By default the assay source 'Bioseek' is excluded due to comparatively low ACC values (Corsi et al. 2019)."),
-                                        tabPanel("Flags", "Flags are assigned to assay results as part of quality assurance for inclusion in the CompTox database. Flags with an * have been removed in accordance with toxEval.", 
+                                        tabPanel("Flags", "Flags are assigned to assay results as part of quality assurance for inclusion in the CompTox database. Flags with an * have been filtered by default in accordance with toxEval.", 
                                                  "Flag descriptions were obtained from the tcpl R package (Filer, 2022).", 
                                                  br(" "),
                                                  tableOutput("table")),
@@ -366,7 +368,7 @@ server <- function(input, output, session) {
     } else {
     if(is.null(file)){
       pnec %>% 
-        filter(grepl(input$searchText, CAS))
+        filter(grepl(paste0("\\b(",paste(input$searchText), ")\\b"), CAS))
     } else{
       file <- input$data
       ext <- tools::file_ext(file$datapath)
